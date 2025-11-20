@@ -1,24 +1,24 @@
 import os, subprocess
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-import apprise
 
 def dr(*a):
     """Thin wrapper for `docker run --rm ...`."""
     subprocess.run(["docker", "run", "--rm", *a], check=True)
 
-def make_notifier(job_context: str, env_var: str = "NOTIFY_URLS"):
-    """
-    Build a notifier from Apprise URLs in an env var.
-    Returns a callable: notify(message: str) -> None.
-    """
+def notify(job_context: str, message: str, env_var: str = "NOTIFY_URLS") -> None:
+    """Send a notification using Apprise URLs from an environment variable."""
     urls = [u.strip() for u in os.getenv(env_var, "").split(",") if u.strip()]
     if not urls:
-        return lambda msg: None
-    app = apprise.Apprise()
-    for u in urls:
-        app.add(u)
-    return lambda msg: app.notify(body=msg, title=job_context)
+        return
+    dr(
+        "caronc/apprise:latest",
+        "-t",
+        job_context,
+        "-b",
+        message,
+        *urls,
+    )
 
 def run_stage(
     mark: Path,
