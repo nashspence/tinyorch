@@ -8,6 +8,10 @@ def dr(*a):
     subprocess.run(["docker", "run", "--rm", *a], check=True)
 
 
+def dc(*a):
+    subprocess.run(["docker", "compose", *a], check=True)
+
+
 def notify(message: str, title_env: str = "JOB_CONTEXT", urls_env: str = "NOTIFY_URLS") -> None:
     urls = [u.strip() for u in os.getenv(urls_env, "").split(",") if u.strip()]
     if not urls:
@@ -24,7 +28,7 @@ def notify(message: str, title_env: str = "JOB_CONTEXT", urls_env: str = "NOTIFY
         pass
 
 
-def run_stage(stage: str, fn, retries: int = 3, success_msg: str | None = None):
+def run(stage: str, retries: int = 3, success_msg: str | None = None):
     root = Path(os.getenv("RUN_DIR", "."))
     mark = root / f".{stage}.done"
     if mark.exists():
@@ -32,7 +36,7 @@ def run_stage(stage: str, fn, retries: int = 3, success_msg: str | None = None):
     err = None
     for i in range(1, retries + 1):
         try:
-            fn()
+            dc("run", "--rm", stage)
             mark.touch()
             if success_msg:
                 notify(success_msg)
@@ -50,29 +54,3 @@ def run_parallel(callables):
     with ThreadPoolExecutor(max_workers=len(cbs)) as ex:
         for f in [ex.submit(c) for c in cbs]:
             f.result()
-
-
-def rclone_sync(local_dir: Path, dest_env: str = "RCLONE_DEST") -> None:
-    dest = os.getenv(dest_env)
-    if not dest:
-        notify(f"{dest_env} not set; skipping sync")
-        return
-    dr(
-        "-v", f"{local_dir}:/data",
-        "rclone/rclone:latest",
-        "copy", "/data", dest,
-        "--exclude", "/.*",
-        "--exclude", "**/.*",
-    )
-
-
-def rsync_import(source_dir: Path, stage_dir: Path) -> None:
-    dr(
-        "-v", f"{source_dir}:/in:ro",
-        "-v", f"{stage_dir}:/out",
-        "instrumentisto/rsync-ssh:latest", "sh", "-lc",
-        "rsync -a --partial --info=progress2 "
-        "--exclude '/.*' --exclude '**/.*' "
-        "--remove-source-files /in/ /out/ && "
-        "find /in -depth -type d -empty -delete"
-    )
