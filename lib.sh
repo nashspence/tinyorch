@@ -1,13 +1,5 @@
 #!/usr/bin/env sh
 
-dr() {
-    docker run --rm "$@"
-}
-
-dc() {
-    docker compose "$@"
-}
-
 notify() {
     message=${1-}
     title_env=${2-JOB_CONTEXT}
@@ -23,31 +15,75 @@ notify() {
     done
     IFS=' \t\n'
     [ $# -gt 0 ] || return 0
-    dr caronc/apprise:latest -t "$title" -b "$message" "$@" || true
+    docker run --rm caronc/apprise:latest -t "$title" -b "$message" "$@" || true
 }
 
 run() {
     stage=$1
-    retries=${2-3}
-    success_msg=${3-}
+    retries=$2
+    success_msg=$3
+
+    shift 3
 
     root=${RUN_DIR-.}
     mark="$root/.${stage}.done"
 
     [ -e "$mark" ] && return 0
 
+    if [ "$#" -eq 0 ]; then
+        set -- dc run --rm "$stage"
+    fi
+
+    if [ "x$retries" = "x-1" ]; then
+        attempt=0
+        last_status=0
+        while :; do
+            attempt=$((attempt + 1))
+            if "$@"; then
+                : >"$mark"
+                [ -n "$success_msg" ] && notify "$success_msg"
+                return 0
+            fi
+            last_status=$?
+            notify "$stage failed (attempt $attempt): exited with status $last_status"
+
+            if ! [ -t 0 ]; then
+                break
+            fi
+
+            printf '[%s] failed (attempt %s). Retry stage "%s"? [y/N]: ' \
+                "$stage" "$attempt" "$stage" >&2
+
+            if ! IFS= read -r answer; then
+                break
+            fi
+
+            case $answer in
+                y|Y|yes|YES) ;;
+                *) break ;;
+            esac
+        done
+        return "$last_status"
+    fi
+
+    case $retries in
+        ''|*[!0-9]*)
+            printf 'run: retries must be -1 or a non-negative integer (got "%s")\n' \
+                "$retries" >&2
+            return 2
+            ;;
+    esac
+
     attempt=1
     last_status=0
-
     while [ "$attempt" -le "$retries" ]; do
-        if dc run --rm "$stage"; then
+        if "$@"; then
             : >"$mark"
             [ -n "$success_msg" ] && notify "$success_msg"
             return 0
-        else
-            last_status=$?
-            notify "$stage failed ($attempt/$retries): exited with status $last_status"
         fi
+        last_status=$?
+        notify "$stage failed ($attempt/$retries): exited with status $last_status"
         attempt=$((attempt + 1))
     done
 
