@@ -5,15 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tinyorch"
 version = "0.1.0"
-description = "Tiny docker-orchestration helpers for container-based media workflows."
-authors = [{ name = "Your Name" }]
+description = "Tiny docker-orchestration helpers."
+authors = [{ name = "Nash Spence" }]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/<you>/tinyorch"
+Homepage = "https://github.com/nashspence/tinyorch"
 
 [tool.setuptools.packages.find]
 where = ["."]
