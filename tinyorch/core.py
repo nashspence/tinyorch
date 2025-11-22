@@ -28,7 +28,7 @@ def notify(message: str, title_env: str = "JOB_CONTEXT", urls_env: str = "NOTIFY
         pass
 
 
-def run(stage: str, retries: int = 3, success_msg: str | None = None):
+def run(stage: str, retries: int = 0, success_msg: str | None = None):
     root = Path(os.getenv("RUN_DIR", "."))
     mark = root / f".{stage}.done"
     if mark.exists():
