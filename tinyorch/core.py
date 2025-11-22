@@ -4,6 +4,10 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 
+def dr(*a):
+    subprocess.run(["docker", "run", "--rm", *a], check=True)
+
+
 def dc(*a):
     subprocess.run(["docker", "compose", *a], check=True)
 
