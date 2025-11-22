@@ -33,7 +33,33 @@ def run(stage: str, retries: int = 3, success_msg: str | None = None):
     mark = root / f".{stage}.done"
     if mark.exists():
         return
-    err = None
+    err: Exception | None = None
+    if retries == -1:
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                dc("run", "--rm", stage)
+                mark.touch()
+                if success_msg:
+                    notify(success_msg)
+                return
+            except Exception as e:
+                err = e
+                notify(f"{stage} failed (attempt {attempt}): {e}")
+                if not sys.stdin.isatty():
+                    break
+                try:
+                    answer = input(
+                        f"[{stage}] failed (attempt {attempt}). Retry stage '{stage}'? [y/N]: "
+                    ).strip().lower()
+                except EOFError:
+                    break
+                if answer not in ("y", "yes"):
+                    break
+        raise err
+    if retries < 0:
+        raise ValueError("retries must be -1 (interactive) or >= 0")
     for i in range(1, retries + 1):
         try:
             dc("run", "--rm", stage)
