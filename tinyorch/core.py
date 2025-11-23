@@ -1,16 +1,29 @@
 import os
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
+def _require_docker() -> str:
+    docker_path = shutil.which("docker")
+    if not docker_path:
+        raise RuntimeError(
+            "The Docker CLI is required but was not found in PATH. Install Docker "
+            "or ensure the 'docker' executable is available before running tinyorch commands."
+        )
+    return docker_path
+
+
 def dr(*a):
-    subprocess.run(["docker", "run", "--rm", *a], check=True)
+    docker = _require_docker()
+    subprocess.run([docker, "run", "--rm", *a], check=True)
 
 
 def dc(*a):
-    subprocess.run(["docker", "compose", *a], check=True)
+    docker = _require_docker()
+    subprocess.run([docker, "compose", *a], check=True)
 
 
 def notify(message: str, title_env: str = "JOB_CONTEXT", urls_env: str = "NOTIFY_URLS") -> None:
