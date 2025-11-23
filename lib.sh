@@ -131,6 +131,19 @@ public static class A {
     fi
 }
 
+prompt_enter() {
+    # $1 = message to show (optional)
+    if [ -t 0 ]; then
+        if [ -n "$1" ]; then
+            printf "%s" "$1" >&2
+        else
+            printf "Press Enter to continue... " >&2
+        fi
+
+        IFS= read -r _ || true
+    fi
+}
+
 ensure_docker_host() {
   (
     set -eu
