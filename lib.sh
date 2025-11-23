@@ -144,6 +144,47 @@ prompt_enter() {
     fi
 }
 
+burn_iso() {
+    iso=$1
+
+    [ -z "$iso" ] && { printf 'usage: burn_iso ISO_PATH\n' >&2; return 2; }
+    [ ! -f "$iso" ] && { printf 'burn_iso: file not found: %s\n' "$iso" >&2; return 1; }
+
+    os=$(uname 2>/dev/null || printf unknown)
+
+    if [ "$os" = Darwin ] && command -v drutil >/dev/null 2>&1; then
+        drutil burn -speed max "$iso" && return 0
+    fi
+
+    if [ "$os" = Linux ]; then
+        kernel=$(uname -r 2>/dev/null || printf '')
+        case $kernel in
+            *Microsoft*|*microsoft*) : ;;
+            *)
+                dev=${BURN_DEV-}
+                if [ -z "$dev" ]; then
+                    for d in /dev/dvd /dev/sr0 /dev/cdrom; do
+                        [ -e "$d" ] && { dev=$d; break; }
+                    done
+                fi
+
+                if [ -n "$dev" ]; then
+                    if command -v growisofs >/dev/null 2>&1; then
+                        growisofs -speed=MAX -dvd-compat -Z "$dev"="$iso" && return 0
+                    elif command -v wodim >/dev/null 2>&1; then
+                        wodim dev="$dev" speed=max -v -data "$iso" && return 0
+                    elif command -v cdrecord >/dev/null 2>&1; then
+                        cdrecord dev="$dev" speed=max -v -data "$iso" && return 0
+                    fi
+                fi
+                ;;
+        esac
+    fi
+
+    printf 'burn_iso: automatic burning not available; burn this ISO manually: %s\n' "$iso" >&2
+    return 0
+}
+
 ensure_docker_host() {
   (
     set -eu
