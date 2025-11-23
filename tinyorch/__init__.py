@@ -1,3 +1,3 @@
-from .core import dr, notify, run_stage, run_parallel, rclone_sync
+from .core import dr, dc, notify, run, run_parallel
 
-__all__ = ["dr", "notify", "run_stage", "run_parallel", "rclone_sync"]
+__all__ = ["dr", "dc", "notify", "run", "run_parallel"]
