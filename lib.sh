@@ -106,6 +106,31 @@ run_parallel() {
     done
 }
 
+keep_awake() {
+    if command -v caffeinate >/dev/null 2>&1; then
+        caffeinate -i -w "$$" &
+    elif command -v systemd-inhibit >/dev/null 2>&1; then
+        systemd-inhibit --what=sleep --mode=block --pid "$$" sleep infinity &
+    elif command -v powershell.exe >/dev/null 2>&1; then
+        powershell.exe -WindowStyle Hidden -Command '
+            param($p)
+            Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class A {
+    [DllImport("kernel32.dll")]
+    public static extern uint SetThreadExecutionState(uint e);
+}
+"@
+            $f=0x80000002
+            while(Get-Process -Id $p -ErrorAction SilentlyContinue){
+                [A]::SetThreadExecutionState($f)|Out-Null
+                Start-Sleep 30
+            }
+        ' -- "$$" &
+    fi
+}
+
 ensure_docker_host() {
   (
     set -eu
