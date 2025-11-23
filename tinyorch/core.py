@@ -1,7 +1,8 @@
 import os
 import subprocess
-from pathlib import Path
+import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 
 def dr(*a):
@@ -60,7 +61,8 @@ def run(stage: str, retries: int = 0, success_msg: str | None = None):
         raise err
     if retries < 0:
         raise ValueError("retries must be -1 (interactive) or >= 0")
-    for i in range(1, retries + 1):
+    total_attempts = retries + 1
+    for attempt in range(total_attempts):
         try:
             dc("run", "--rm", stage)
             mark.touch()
@@ -69,8 +71,10 @@ def run(stage: str, retries: int = 0, success_msg: str | None = None):
             return
         except Exception as e:
             err = e
-            notify(f"{stage} failed ({i}/{retries}): {e}")
-    raise err
+            notify(f"{stage} failed ({attempt + 1}/{total_attempts}): {e}")
+    if err:
+        raise err
+    raise RuntimeError(f"Stage '{stage}' failed without raising an exception")
 
 
 def run_parallel(callables):
