@@ -185,6 +185,71 @@ burn_iso() {
     return 0
 }
 
+pw() {
+    id=$1
+    [ -n "$id" ] || { printf 'usage: pw <id>\n' >&2; return 1; }
+
+    acct=${USER:-$(id -un 2>/dev/null)}
+    os=$(uname -s 2>/dev/null || echo unknown)
+
+    # linux/wsl helper
+    _pw_ensure_secret_tool() {
+        command -v secret-tool >/dev/null 2>&1 && return 0
+        if command -v apt-get >/dev/null 2>&1; then
+            printf "Installing libsecret-tools (sudo may be required)...\n" >&2
+            sudo apt-get update && sudo apt-get install -y libsecret-tools >/dev/null 2>&1 || {
+                printf 'Failed to install libsecret-tools; install secret-tool manually.\n' >&2
+                return 1
+            }
+        else
+            printf "'secret-tool' not found; install it manually.\n" >&2
+            return 1
+        fi
+    }
+
+    # try to read existing password
+    pw=''
+    case "$os" in
+        Darwin)
+            pw=$(security find-generic-password -a "$acct" -s "$id" -w 2>/dev/null)
+            backend=mac
+            ;;
+        Linux)
+            # treat WSL as Linux/secret-tool
+            if ! _pw_ensure_secret_tool; then return 1; fi
+            pw=$(secret-tool lookup service "$id" account "$acct" 2>/dev/null)
+            backend=linux
+            ;;
+        *)
+            printf 'Unsupported OS: %s\n' "$os" >&2
+            return 1
+            ;;
+    esac
+
+    # prompt if missing and store
+    if [ -z "$pw" ]; then
+        printf "Enter password for '%s': " "$id" >&2
+        oldstty=$(stty -g 2>/dev/null || echo "")
+        stty -echo 2>/dev/null
+        IFS= read -r pw
+        [ -n "$oldstty" ] && stty "$oldstty" 2>/dev/null
+        printf '\n' >&2
+
+        case "$backend" in
+            mac)
+                security add-generic-password -a "$acct" -s "$id" -w "$pw" -U >/dev/null 2>&1
+                ;;
+            linux)
+                printf '%s' "$pw" | secret-tool store --label="$id" service "$id" account "$acct" >/dev/null 2>&1
+                ;;
+        esac
+    fi
+
+    printf '%s\n' "$pw"
+    pw=
+    unset pw
+}
+
 ensure_docker_host() {
   (
     set -eu
