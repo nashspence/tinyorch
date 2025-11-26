@@ -583,6 +583,40 @@ PLIST
           vm_socket=$(printf '%s\n' "$vm_uri" | sed -E 's#^[^/]*//[^/]+(/.*)#\1#')
         fi
 
+                # VM-side Podman socket (inside the Linux VM)
+        vm_socket=""
+
+        # Try to get URI from machine inspect and strip scheme/host
+        vm_uri=$(podman machine inspect "$machine_name" \
+          --format '{{.ConnectionInfo.PodmanSocket.URI}}' 2>/dev/null || printf '')
+
+        if [ -n "$vm_uri" ]; then
+          vm_socket=$(printf '%s\n' "$vm_uri" | sed -E 's#^[^/]*//[^/]+(/.*)#\1#')
+        fi
+
+        # --- minimal fix: correct socket path for rootless machines ---
+        rootful=$(podman machine inspect "$machine_name" \
+          --format '{{.Rootful}}' 2>/dev/null || echo true)
+        if [ "$rootful" = "false" ]; then
+          # Rootless podman uses /run/user/<uid>/podman/podman.sock inside the VM
+          vm_socket="/run/user/$(id -u)/podman/podman.sock"
+        fi
+        # --- end minimal fix ---
+
+        # Fallback: default connection URI
+        if [ -z "$vm_socket" ]; then
+          default_uri=$(podman system connection ls \
+            --format '{{.Default}} {{.URI}}' 2>/dev/null | awk '$1=="true"{print $2; exit}' || printf '')
+          if [ -n "$default_uri" ]; then
+            vm_socket=$(printf '%s\n' "$default_uri" | sed -E 's#^[^/]*//[^/]+(/.*)#\1#')
+          fi
+        fi
+
+        if [ -z "$vm_socket" ]; then
+          # Reasonable Podman default inside the VM
+          vm_socket="/run/user/$(id -u)/podman/podman.sock"
+        fi
+
         # Fallback: default connection URI
         if [ -z "$vm_socket" ]; then
           default_uri=$(podman system connection ls \
