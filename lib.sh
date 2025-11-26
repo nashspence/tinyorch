@@ -15,7 +15,7 @@ notify() {
     done
     IFS=' \t\n'
     [ $# -gt 0 ] || return 0
-    docker run --rm caronc/apprise:latest -t "$title" -b "$message" "$@" || true
+    docker run --rm caronc/apprise:latest apprise -t "$title" -b "$message" "$@" || true
 }
 
 run() {
