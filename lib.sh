@@ -475,6 +475,7 @@ for f in "$state_dir"/*; do
   if kill -0 "$pid" 2>/dev/null; then
     continue
   fi
+  podman machine ssh "$machine" -- podman system prune -a --volumes --force --filter "until=720h" || true
   podman machine stop "$machine" || true
   rm -f "$f" 2>/dev/null || true
 done
@@ -608,6 +609,7 @@ PLIST
             sleep 2
           done
 
+          podman_cmd machine ssh "$machine_name" -- podman system prune -a --volumes --force --filter "until=720h" || true
           podman_cmd machine stop "$machine_name" || true
           rm -f "$state_file" 2>/dev/null || true
         ) &
