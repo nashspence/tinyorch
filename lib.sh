@@ -2,8 +2,8 @@
 
 notify() {
     message=${1-}
-    title_env=${2-JOB_CONTEXT}
-    urls_env=${3-NOTIFY_URLS}
+    title_env=${2-JOB}
+    urls_env=${3-NOTIFY}
     eval "title=\${${title_env}-job}"
     urls_value=$(printenv "$urls_env")
     [ -n "$urls_value" ] || return 0
