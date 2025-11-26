@@ -415,11 +415,11 @@ ensure_docker_host() {
         memory_mb=512
       fi
 
-      disk_available_kb=$(df -k / 2>/dev/null | awk 'NR==2 {print $4}' || printf '0')
-      case "$disk_available_kb" in
-        ''|*[!0-9]*) disk_available_kb=0 ;;
+      disk_total_kb=$(df -k / 2>/dev/null | awk 'NR==2 {print $2}' || printf '0')
+      case "$disk_total_kb" in
+        ''|*[!0-9]*) disk_total_kb=0 ;;
       esac
-      disk_size_gb=$((disk_available_kb / 1024 / 1024 / 2))
+      disk_size_gb=$((disk_total_kb * 80 / 100 / 1024 / 1024))
       if [ "$disk_size_gb" -lt 10 ] 2>/dev/null; then
         disk_size_gb=10
       fi
