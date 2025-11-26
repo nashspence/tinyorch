@@ -26,7 +26,7 @@ def dc(*a):
     subprocess.run([docker, "compose", *a], check=True)
 
 
-def notify(message: str, title_env: str = "JOB_CONTEXT", urls_env: str = "NOTIFY_URLS") -> None:
+def notify(message: str, title_env: str = "JOB", urls_env: str = "NOTIFY") -> None:
     urls = [u.strip() for u in os.getenv(urls_env, "").split(",") if u.strip()]
     if not urls:
         return
