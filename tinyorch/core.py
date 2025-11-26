@@ -34,6 +34,7 @@ def notify(message: str, title_env: str = "JOB", urls_env: str = "NOTIFY") -> No
     try:
         dr(
             "caronc/apprise:latest",
+            "apprise",
             "-t", title,
             "-b", message,
             *urls,
