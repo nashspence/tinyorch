@@ -39,7 +39,8 @@ def notify(message: str, title_env: str = "JOB", urls_env: str = "NOTIFY") -> No
             "-b", message,
             *urls,
         )
-    except Exception:
+    except Exception as e:
+        print(f"notify: failed: {e!r}", file=sys.stderr)
         pass
 
 
