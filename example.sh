@@ -3,15 +3,7 @@ curl -fsSL "https://raw.githubusercontent.com/nashspence/tinyorch/main/lib.sh" >
 . "$TMP_LIB"
 
 eval "$(
-  ensure_docker_host $$ \
-    --cpus=4 \
-    --memory=8192 \
-    --disk-size=100 \
-    --swap=2048 \
-    --timezone="America/Los_Angeles" \
-    --volume=/Users:/Users \
-    --volume=/Volumes:/Volumes \
-    machine-name-if-needed
+  ensure_docker_host "$$"
 )"
 export DOCKER_HOST DOCKER_SOCKET
 

@@ -283,15 +283,14 @@ ensure_docker_host() {
       exit 0
     fi
 
-    if [ "$#" -lt 1 ]; then
-      echo "usage: ensure_docker_host pid [podman-machine-init-args...] machine-name" >&2
+    if [ "$#" -ne 1 ]; then
+      echo "usage: ensure_docker_host <parent_pid>" >&2
       exit 2
     fi
 
     target_pid=$1
-    shift || true
     case "$target_pid" in
-      ''|*[!0-9]*) echo "invalid pid: $target_pid" >&2; exit 2 ;;
+      ''|*[!0-9]*) echo "invalid parent pid: $target_pid" >&2; exit 2 ;;
     esac
 
     os_name=$(uname -s || echo unknown)
@@ -401,6 +400,33 @@ ensure_docker_host() {
       }
     }
 
+    macos_machine_defaults() {
+      cpus=$(sysctl -n hw.ncpu 2>/dev/null || printf '1')
+      case "$cpus" in
+        ''|*[!0-9]*) cpus=1 ;;
+      esac
+
+      mem_bytes=$(sysctl -n hw.memsize 2>/dev/null || printf '0')
+      case "$mem_bytes" in
+        ''|*[!0-9]*) mem_bytes=0 ;;
+      esac
+      memory_mb=$((mem_bytes / 1024 / 1024 * 80 / 100))
+      if [ "$memory_mb" -lt 512 ] 2>/dev/null; then
+        memory_mb=512
+      fi
+
+      disk_available_kb=$(df -k / 2>/dev/null | awk 'NR==2 {print $4}' || printf '0')
+      case "$disk_available_kb" in
+        ''|*[!0-9]*) disk_available_kb=0 ;;
+      esac
+      disk_size_gb=$((disk_available_kb / 1024 / 1024 / 2))
+      if [ "$disk_size_gb" -lt 10 ] 2>/dev/null; then
+        disk_size_gb=10
+      fi
+
+      printf '%s\n' "$cpus" "$memory_mb" "$disk_size_gb"
+    }
+
     podman_cmd() {
       if [ -w /dev/tty ] 2>/dev/null; then
         printf '+ podman %s\n' "$*" >/dev/tty
@@ -417,27 +443,7 @@ ensure_docker_host() {
         ensure_podman_macos
         ensure_docker_cli_and_compose_macos
 
-        if [ "$#" -lt 1 ]; then
-          echo "machine name (last argument) is required" >&2
-          exit 2
-        fi
-
-        last_arg=$1
-        for a; do last_arg=$a; done
-
-        case "$last_arg" in
-          '' )
-            echo "machine name (last argument) is required" >&2
-            exit 2
-            ;;
-          -* )
-            echo "machine name (last argument) must not start with '-'" >&2
-            exit 2
-            ;;
-          * )
-            machine_name=$last_arg
-            ;;
-        esac
+        machine_name="tinyorch"
 
         uid=$(id -u)
         base_dir="$HOME/Library/Application Support/temp-podman-machine"
@@ -470,7 +476,6 @@ for f in "$state_dir"/*; do
     continue
   fi
   podman machine stop "$machine" || true
-  podman machine rm -f "$machine" || true
   rm -f "$f" 2>/dev/null || true
 done
 exit 0
@@ -532,7 +537,6 @@ PLIST
               else
                 if podman machine inspect "$machine_name" >/dev/null 2>&1; then
                   podman_cmd machine stop "$machine_name" || true
-                  podman_cmd machine rm -f "$machine_name" || true
                 fi
                 rm -f "$state_file" 2>/dev/null || true
               fi
@@ -540,29 +544,18 @@ PLIST
           esac
         fi
 
-        # Build init args without the machine name
-        set -- "$@"
-        init_args=
-        for arg; do
-          [ "$arg" = "$machine_name" ] && continue
-          if [ -z "$init_args" ]; then
-            init_args=$arg
-          else
-            init_args="$init_args $arg"
-          fi
-        done
+        if ! podman machine inspect "$machine_name" >/dev/null 2>&1; then
+          set -- $(macos_machine_defaults)
+          machine_cpus=$1
+          machine_memory_mb=$2
+          machine_disk_gb=$3
 
-        if podman machine inspect "$machine_name" >/dev/null 2>&1; then
-          podman_cmd machine stop "$machine_name" || true
-          podman_cmd machine rm -f "$machine_name" || true
-        fi
-
-        if [ -n "$init_args" ]; then
-          # shellcheck disable=SC2086
-          set -- $init_args
-          podman_cmd machine init "$@" "$machine_name"
-        else
-          podman_cmd machine init "$machine_name"
+          podman_cmd machine init "$machine_name" \
+            --cpus "$machine_cpus" \
+            --memory "$machine_memory_mb" \
+            --disk-size "$machine_disk_gb" \
+            --volume /Users:/Users \
+            --volume /Volumes:/Volumes
         fi
 
         podman_cmd machine start "$machine_name"
@@ -616,7 +609,6 @@ PLIST
           done
 
           podman_cmd machine stop "$machine_name" || true
-          podman_cmd machine rm -f "$machine_name" || true
           rm -f "$state_file" 2>/dev/null || true
         ) &
 
