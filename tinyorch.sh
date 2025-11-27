@@ -3,18 +3,23 @@ set -eu
 
 [ "${DEBUG:-}" ] && set -x
 
-if ! command -v pkgx >/dev/null 2>&1; then
+PKGX="$HOME/.pkgx-local/pkgx"
+
+if ! command -v "$PKGX" >/dev/null 2>&1; then
+  mkdir -p "$HOME/.pkgx-local"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsS https://pkgx.sh | sh
+    curl -fsSL https://pkgx.sh/$(uname)/$(uname -m) -o "$PKGX"
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO- https://pkgx.sh | sh
+    wget -qO "$PKGX" https://pkgx.sh/$(uname)/$(uname -m)
   else
     echo "need curl or wget to install pkgx" >&2
     exit 1
   fi
+  chmod +x "$PKGX"
 fi
 
-pkgx install podman.io docker.com python.org >/dev/null 2>&1 || true
+# use pkgx directly, without PATH changes
+"$PKGX" install podman.io docker.com python.org >/dev/null 2>&1 || true
 
 podman() { pkgx podman "$@"; }
 docker() { pkgx docker "$@"; }
