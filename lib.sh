@@ -250,6 +250,39 @@ pw() {
     unset pw
 }
 
+load_sidecar_env() {
+    SIDECAR_ENV=
+    SIDECAR_ENV_ARG=
+    script=$1
+    script_dir=$(dirname "$script")
+    script_dir=$(cd "$script_dir" 2>/dev/null && pwd || printf '%s\n' "$script_dir")
+    script_base=$(basename "$script")
+    SIDECAR_ENV="$script_dir/$script_base.env"
+    if [ -r "$SIDECAR_ENV" ]; then
+        set -a
+        . "$SIDECAR_ENV"
+        set +a
+        SIDECAR_ENV_ARG="--env-file=$SIDECAR_ENV"
+    fi
+}
+
+wait_for_files() {
+    interval=$1
+    shift
+    if [ "$#" -eq 0 ]; then
+        return 1
+    fi
+    while :; do
+        for f in "$@"; do
+            if [ ! -f "$f" ]; then
+                sleep "$interval"
+                continue 2
+            fi
+        done
+        break
+    done
+}
+
 ensure_docker_host() {
   (
     set -eu
