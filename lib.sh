@@ -513,13 +513,21 @@ state_dir="$base_dir/state"
 for f in "$state_dir"/*; do
   [ -f "$f" ] || continue
   machine=$(basename "$f")
-  pid=$(sed -n '1p' "$f" 2>/dev/null || printf '')
-  case "$pid" in
-    ''|*[!0-9]*) rm -f "$f" 2>/dev/null || true; continue ;;
-  esac
-  if kill -0 "$pid" 2>/dev/null; then
+  alive=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ''|*[!0-9]*) continue ;;
+    esac
+    if kill -0 "$line" 2>/dev/null; then
+      alive="${alive}${line}\n"
+    fi
+  done <"$f"
+
+  if [ -n "$alive" ]; then
+    printf '%s' "$alive" | sort -u >"$f"
     continue
   fi
+
   podman machine ssh "$machine" -- podman system prune -a --volumes --force --filter "until=720h" || true
   podman machine stop "$machine" || true
   rm -f "$f" 2>/dev/null || true
@@ -572,24 +580,25 @@ PLIST
         fi
 
         state_file="$state_dir/$machine_name"
-        if [ -f "$state_file" ]; then
-          old_pid=$(sed -n '1p' "$state_file" 2>/dev/null || printf '')
-          case "$old_pid" in
-            ''|*[!0-9]*) rm -f "$state_file" 2>/dev/null || true ;;
-            *)
-              if kill -0 "$old_pid" 2>/dev/null; then
-                echo "machine '$machine_name' already in use by pid $old_pid" >&2
-                exit 1
-              else
-                if podman machine inspect "$machine_name" >/dev/null 2>&1; then
-                  podman_cmd machine stop "$machine_name" || true
-                fi
-                rm -f "$state_file" 2>/dev/null || true
-              fi
-              ;;
-          esac
+        read_state_pids() {
+          file=$1
+          [ -f "$file" ] || return 0
+          while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+              ''|*[!0-9]*) continue ;;
+            esac
+            if kill -0 "$line" 2>/dev/null; then
+              printf '%s\n' "$line"
+            fi
+          done <"$file"
+        }
+
+        alive_pids=$(read_state_pids "$state_file" || printf '')
+        if [ -z "$alive_pids" ]; then
+          rm -f "$state_file" 2>/dev/null || true
         fi
 
+        machine_state=""
         if ! podman machine inspect "$machine_name" >/dev/null 2>&1; then
           set -- $(macos_machine_defaults)
           machine_cpus=$1
@@ -602,11 +611,18 @@ PLIST
             --disk-size "$machine_disk_gb" \
             --volume /Users:/Users \
             --volume /Volumes:/Volumes
+
+          machine_state="stopped"
+        else
+          machine_state=$(podman machine inspect "$machine_name" --format '{{.State}}' 2>/dev/null || printf '')
         fi
 
-        podman_cmd machine start "$machine_name"
+        if [ "$machine_state" != "running" ]; then
+          podman_cmd machine start "$machine_name"
+          machine_state="running"
+        fi
 
-        printf '%s\n' "$target_pid" >"$state_file"
+        { printf '%s\n' "$target_pid"; [ -n "$alive_pids" ] && printf '%s\n' "$alive_pids"; } | sort -u >"$state_file"
 
         # Host-side helper socket (macOS filesystem)
         host_socket=$(podman machine inspect "$machine_name" \
@@ -618,17 +634,6 @@ PLIST
         fi
 
         # VM-side Podman socket (inside the Linux VM)
-        vm_socket=""
-
-        # Try to get URI from machine inspect and strip scheme/host
-        vm_uri=$(podman machine inspect "$machine_name" \
-          --format '{{.ConnectionInfo.PodmanSocket.URI}}' 2>/dev/null || printf '')
-
-        if [ -n "$vm_uri" ]; then
-          vm_socket=$(printf '%s\n' "$vm_uri" | sed -E 's#^[^/]*//[^/]+(/.*)#\1#')
-        fi
-
-                # VM-side Podman socket (inside the Linux VM)
         vm_socket=""
 
         # Try to get URI from machine inspect and strip scheme/host
@@ -662,20 +667,6 @@ PLIST
           vm_socket="/run/user/$(id -u)/podman/podman.sock"
         fi
 
-        # Fallback: default connection URI
-        if [ -z "$vm_socket" ]; then
-          default_uri=$(podman system connection ls \
-            --format '{{.Default}} {{.URI}}' 2>/dev/null | awk '$1=="true"{print $2; exit}' || printf '')
-          if [ -n "$default_uri" ]; then
-            vm_socket=$(printf '%s\n' "$default_uri" | sed -E 's#^[^/]*//[^/]+(/.*)#\1#')
-          fi
-        fi
-
-        if [ -z "$vm_socket" ]; then
-          # Reasonable Podman default inside the VM
-          vm_socket="/run/user/$(id -u)/podman/podman.sock"
-        fi
-
         (
           set -eu
           if [ -w /dev/tty ] 2>/dev/null; then
@@ -687,6 +678,12 @@ PLIST
           while kill -0 "$target_pid" 2>/dev/null; do
             sleep 2
           done
+
+          remaining=$(read_state_pids "$state_file" | grep -v "^${target_pid}$" || true)
+          if [ -n "$remaining" ]; then
+            printf '%s\n' "$remaining" | sort -u >"$state_file"
+            exit 0
+          fi
 
           podman_cmd machine ssh "$machine_name" -- podman system prune -a --volumes --force --filter "until=720h" || true
           podman_cmd machine stop "$machine_name" || true
