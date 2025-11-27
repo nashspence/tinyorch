@@ -1,5 +1,24 @@
 #!/usr/bin/env sh
 
+print_cmd() {
+    printf '\n$ '
+    first=1
+    for arg do
+        case $arg in
+            *[!A-Za-z0-9_./-]*|'')
+                arg=$(printf "%s" "$arg" | sed "s/'/'\"'\"'/g")
+                arg="'$arg'"
+                ;;
+        esac
+        if [ $first -eq 0 ]; then
+            printf ' '
+        fi
+        printf '%s' "$arg"
+        first=0
+    done
+    printf '\n'
+}
+
 notify() {
     message=${1-}
     title_env=${2-JOB}
@@ -15,6 +34,7 @@ notify() {
     done
     IFS=' \t\n'
     [ $# -gt 0 ] || return 0
+    print_cmd docker run --rm caronc/apprise:latest apprise -t "$title" -b "$message" "$@"
     docker run --rm caronc/apprise:latest apprise -t "$title" -b "$message" "$@" || true
 }
 
@@ -30,15 +50,12 @@ run() {
 
     [ -e "$mark" ] && return 0
 
-    if [ "$#" -eq 0 ]; then
-        set -- dc run --rm "$stage"
-    fi
-
     if [ "x$retries" = "x-1" ]; then
         attempt=0
         last_status=0
         while :; do
             attempt=$((attempt + 1))
+            print_cmd "$@"
             if "$@"; then
                 : >"$mark"
                 [ -n "$success_msg" ] && notify "$success_msg"
@@ -46,18 +63,14 @@ run() {
             fi
             last_status=$?
             notify "$stage failed (attempt $attempt): exited with status $last_status"
-
             if ! [ -t 0 ]; then
                 break
             fi
-
             printf '[%s] failed (attempt %s). Retry stage "%s"? [y/N]: ' \
                 "$stage" "$attempt" "$stage" >&2
-
             if ! IFS= read -r answer; then
                 break
             fi
-
             case $answer in
                 y|Y|yes|YES) ;;
                 *) break ;;
@@ -65,7 +78,6 @@ run() {
         done
         return "$last_status"
     fi
-
     case $retries in
         ''|*[!0-9]*)
             printf 'run: retries must be -1 or a non-negative integer (got "%s")\n' \
@@ -73,10 +85,10 @@ run() {
             return 2
             ;;
     esac
-
     attempt=1
     last_status=0
     while [ "$attempt" -le "$retries" ]; do
+        print_cmd "$@"
         if "$@"; then
             : >"$mark"
             [ -n "$success_msg" ] && notify "$success_msg"

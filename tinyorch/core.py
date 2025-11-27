@@ -18,12 +18,16 @@ def _require_docker() -> str:
 
 def dr(*a):
     docker = _require_docker()
-    subprocess.run([docker, "run", "--rm", *a], check=True)
+    cmd = [docker, "run", "--rm", *a]
+    print("\n$ " + " ".join(shlex.quote(str(x)) for x in cmd))
+    subprocess.run(cmd, check=True)
 
 
 def dc(*a):
     docker = _require_docker()
-    subprocess.run([docker, "compose", *a], check=True)
+    cmd = [docker, "compose", *a]
+    print("\n$ " + " ".join(shlex.quote(str(x)) for x in cmd))
+    subprocess.run(cmd, check=True)
 
 
 def notify(message: str, title_env: str = "JOB", urls_env: str = "NOTIFY") -> None:
