@@ -21,9 +21,9 @@ fi
 # use pkgx directly, without PATH changes
 "$PKGX" install podman.io docker.com python.org >/dev/null 2>&1 || true
 
-podman() { pkgx podman "$@"; }
-docker() { pkgx docker "$@"; }
-python() { pkgx python "$@"; }
+podman() { "$PKGX" podman "$@"; }
+docker() { "$PKGX" docker "$@"; }
+python() { "$PKGX" python "$@"; }
 
 int_or_default() {
   case "$1" in
