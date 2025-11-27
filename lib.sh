@@ -300,34 +300,6 @@ ensure_docker_host() {
     set -eu
     [ "${DEBUG:-}" ] && set -x
 
-    # Emit DOCKER_HOST/DOCKER_SOCKET if something already exists.
-    try_existing_docker_env() {
-      if [ -n "${DOCKER_HOST:-}" ]; then
-        host=$DOCKER_HOST
-        socket=""
-        case "$host" in
-          unix://*)
-            socket=${host#unix://}
-            ;;
-        esac
-        printf 'DOCKER_HOST=%s\n' "$host"
-        [ -n "$socket" ] && printf 'DOCKER_SOCKET=%s\n' "$socket"
-        return 0
-      fi
-
-      if [ -S /var/run/docker.sock ]; then
-        printf 'DOCKER_HOST=unix:///var/run/docker.sock\n'
-        printf 'DOCKER_SOCKET=/var/run/docker.sock\n'
-        return 0
-      fi
-
-      return 1
-    }
-
-    if try_existing_docker_env; then
-      exit 0
-    fi
-
     if [ "$#" -ne 1 ]; then
       echo "usage: ensure_docker_host <parent_pid>" >&2
       exit 2
@@ -339,111 +311,6 @@ ensure_docker_host() {
     esac
 
     os_name=$(uname -s || echo unknown)
-
-    determine_sudo() {
-      if [ "$(id -u)" -eq 0 ]; then
-        echo ""
-      elif command -v sudo >/dev/null 2>&1; then
-        echo "sudo"
-      else
-        echo ""
-      fi
-    }
-
-    ensure_podman_linux() {
-      if command -v podman >/dev/null 2>&1; then
-        return 0
-      fi
-
-      sudo_cmd=$(determine_sudo)
-
-      if command -v apt-get >/dev/null 2>&1; then
-        $sudo_cmd apt-get update
-        $sudo_cmd apt-get install -y podman
-      elif command -v dnf >/dev/null 2>&1; then
-        $sudo_cmd dnf install -y podman
-      elif command -v zypper >/dev/null 2>&1; then
-        $sudo_cmd zypper install -y podman
-      else
-        echo "podman not found and no supported package manager detected (apt, dnf, zypper)" >&2
-        exit 127
-      fi
-
-      command -v podman >/dev/null 2>&1 || {
-        echo "podman is still unavailable after installation" >&2
-        exit 1
-      }
-    }
-
-    ensure_podman_macos() {
-      if command -v podman >/dev/null 2>&1; then
-        return 0
-      fi
-      if ! command -v brew >/dev/null 2>&1; then
-        echo "podman not found and homebrew is unavailable" >&2
-        exit 127
-      fi
-      brew install podman || {
-        echo "failed to install podman via homebrew" >&2
-        exit 1
-      }
-      command -v podman >/dev/null 2>&1 || {
-        echo "podman is still unavailable after installation" >&2
-        exit 1
-      }
-    }
-
-    ensure_docker_cli_and_compose_linux() {
-      if command -v docker >/dev/null 2>&1; then
-        if docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1; then
-          return 0
-        fi
-      fi
-
-      sudo_cmd=$(determine_sudo)
-
-      if command -v apt-get >/dev/null 2>&1; then
-        $sudo_cmd apt-get update
-        $sudo_cmd apt-get install -y docker.io docker-compose-plugin || \
-          $sudo_cmd apt-get install -y docker.io docker-compose
-      elif command -v dnf >/dev/null 2>&1; then
-        $sudo_cmd dnf install -y docker docker-compose-plugin || \
-          $sudo_cmd dnf install -y docker docker-compose
-      elif command -v zypper >/dev/null 2>&1; then
-        $sudo_cmd zypper install -y docker docker-compose
-      else
-        echo "docker CLI not found and no supported package manager detected (apt, dnf, zypper)" >&2
-        exit 127
-      fi
-
-      command -v docker >/dev/null 2>&1 || {
-        echo "docker CLI is still unavailable after installation" >&2
-        exit 1
-      }
-    }
-
-    ensure_docker_cli_and_compose_macos() {
-      if command -v docker >/dev/null 2>&1; then
-        if docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1; then
-          return 0
-        fi
-      fi
-
-      if ! command -v brew >/dev/null 2>&1; then
-        echo "docker CLI not found and homebrew is unavailable" >&2
-        exit 127
-      fi
-
-      brew install docker docker-compose || {
-        echo "failed to install docker CLI/compose via homebrew" >&2
-        exit 1
-      }
-
-      command -v docker >/dev/null 2>&1 || {
-        echo "docker CLI is still unavailable after installation" >&2
-        exit 1
-      }
-    }
 
     macos_machine_defaults() {
       cpus=$(sysctl -n hw.ncpu 2>/dev/null || printf '1')
@@ -485,9 +352,6 @@ ensure_docker_host() {
     case "$os_name" in
       Darwin)
         # ---------- macOS: podman machine + launchd cleanup ----------
-        ensure_podman_macos
-        ensure_docker_cli_and_compose_macos
-
         machine_name="tinyorch"
 
         uid=$(id -u)
@@ -696,9 +560,6 @@ PLIST
 
       Linux)
         # ---------- Linux / WSL2: podman system service on a unix socket ----------
-        ensure_podman_linux
-        ensure_docker_cli_and_compose_linux
-
         runtime_dir=${XDG_RUNTIME_DIR:-/tmp}
         socket_path="$runtime_dir/podman-docker-${target_pid}.sock"
 
