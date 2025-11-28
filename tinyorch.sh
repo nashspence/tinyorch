@@ -23,6 +23,7 @@ fi
 
 podman() { "$PKGX" podman "$@"; }
 docker() { "$PKGX" docker "$@"; }
+export DOCKER="'$PKGX' docker"
 
 VENV_DIR="${TINYORCH_VENV_DIR:-$HOME/.venvs/tinyorch}"
 

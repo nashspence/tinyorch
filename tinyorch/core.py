@@ -19,20 +19,10 @@ def print_cmd(*args):
 
 
 def _require_docker():
-    docker_path = shutil.which("docker")
+    docker_path = os.getenv("DOCKER", shutil.which("docker"))
     if not docker_path:
         raise RuntimeError("docker executable not found in PATH")
     return docker_path
-
-
-def ensure_docker_host():
-    pid = os.getpid()
-    cmd = [
-        "bash", "-lc",
-        f'. "$HOME/.local/tinyorch-lib.sh" && ensure_docker_host {pid}'
-    ]
-    print(cmd)
-    subprocess.run(cmd, check=True)
 
 
 def dr(*args):
