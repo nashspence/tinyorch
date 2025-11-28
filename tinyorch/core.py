@@ -27,9 +27,9 @@ def _require_docker():
 
 def ensure_docker_host():
     pid = os.getpid()
-    cmd = f"ensure_docker_host {pid}"
-    print_cmd("sh", cmd)
-    subprocess.run(["sh", cmd], check=True)
+    cmd = ["ensure_docker_host", pid]
+    print_cmd(cmd)
+    subprocess.run(cmd, check=True)
 
 
 def dr(*args):
