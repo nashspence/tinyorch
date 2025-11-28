@@ -1,11 +1,11 @@
-TMP_LIB=$(mktemp)
-curl -fsSL "https://raw.githubusercontent.com/nashspence/tinyorch/main/lib.sh" > "$TMP_LIB"
-. "$TMP_LIB"
-
-eval "$(
-  ensure_docker_host "$$"
-)"
-export DOCKER_HOST DOCKER_SOCKET
+U=https://raw.githubusercontent.com/nashspence/tinyorch/main/tinyorch.sh
+F=$HOME/.local/tinyorch-lib.sh
+mkdir -p "$HOME/.local"
+curl -fsSL -z "$F" "$U" -o "$F" 2>/dev/null || :
+[ -r "$F" ] || { echo "missing lib" >&2; exit 1; }
+. "$F"
+eval "$(ensure_docker_host $$)"
+export DOCKER_HOST DOCKER_SOCKET DOCKER
 
 echo "DOCKER_HOST=$DOCKER_HOST"
 echo "DOCKER_SOCKET=$DOCKER_SOCKET"
