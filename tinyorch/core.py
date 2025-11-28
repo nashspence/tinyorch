@@ -27,8 +27,11 @@ def _require_docker():
 
 def ensure_docker_host():
     pid = os.getpid()
-    cmd = ["ensure_docker_host", "{pid}"]
-    print_cmd(cmd)
+    cmd = [
+        "bash", "-lc",
+        f'. "$HOME/.local/tinyorch-lib.sh" && ensure_docker_host {pid}'
+    ]
+    print(cmd)
     subprocess.run(cmd, check=True)
 
 
