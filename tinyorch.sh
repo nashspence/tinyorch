@@ -23,7 +23,17 @@ fi
 
 podman() { "$PKGX" podman "$@"; }
 docker() { "$PKGX" docker "$@"; }
-export DOCKER="'$PKGX' docker"
+
+DOCKER_WRAPPER="$HOME/.local/bin/docker-pkgx"
+mkdir -p "$(dirname "$DOCKER_WRAPPER")"
+
+cat >"$DOCKER_WRAPPER" <<EOF
+#!/usr/bin/env sh
+exec "$PKGX" docker "$@"
+EOF
+
+chmod +x "$DOCKER_WRAPPER"
+export DOCKER="$DOCKER_WRAPPER"
 
 VENV_DIR="${TINYORCH_VENV_DIR:-$HOME/.venvs/tinyorch}"
 
