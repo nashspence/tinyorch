@@ -32,7 +32,7 @@ def dr(*args):
     subprocess.run(cmd, check=True)
 
 
-def docker(image, *cmd, env=None, volumes=None, interactive=True):
+def docker(image, *cmd, env=None, volumes=None, interactive=True, entrypoint=None):
     args = []
     if interactive:
         args.append("-it")
@@ -42,6 +42,8 @@ def docker(image, *cmd, env=None, volumes=None, interactive=True):
     if volumes:
         for host, container in volumes:
             args += ["-v", f"{str(host)}:{container}"]
+    if entrypoint:
+        args += ["--entrypoint", entrypoint]
     args.append(image)
     args.extend(cmd)
     return dr(*args)
