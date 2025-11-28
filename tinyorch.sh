@@ -29,7 +29,7 @@ mkdir -p "$(dirname "$DOCKER_WRAPPER")"
 
 cat >"$DOCKER_WRAPPER" <<EOF
 #!/usr/bin/env sh
-exec "$PKGX" docker "$@"
+exec "$PKGX" docker "\$@"
 EOF
 
 chmod +x "$DOCKER_WRAPPER"
