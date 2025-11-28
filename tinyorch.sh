@@ -23,7 +23,24 @@ fi
 
 podman() { "$PKGX" podman "$@"; }
 docker() { "$PKGX" docker "$@"; }
-python() { "$PKGX" python "$@"; }
+
+VENV_DIR="${TINYORCH_VENV_DIR:-$HOME/.venvs/tinyorch}"
+
+mkdir -p "$(dirname "$VENV_DIR")"
+
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+  "$PKGX" python -m venv "$VENV_DIR"
+fi
+
+# use venv python for everything from here on
+python() { "$VENV_DIR/bin/python" "$@"; }
+
+# pip that matches that python
+pip() { python -m pip "$@"; }
+
+# ensure tinyorch is installed in this venv
+pip install --no-cache-dir \
+  git+https://github.com/nashspence/tinyorch.git
 
 int_or_default() {
   case "$1" in
