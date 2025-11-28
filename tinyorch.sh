@@ -389,5 +389,3 @@ PLIST
       ;;
   esac
 }
-
-ensure_docker_host "$@"
