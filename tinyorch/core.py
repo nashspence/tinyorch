@@ -143,22 +143,37 @@ def run_parallel(commands):
 
 
 _keep_awake_proc = None
+_keep_awake_pid = None
 
 
-def keep_awake():
-    global _keep_awake_proc
-    if _keep_awake_proc is not None and _keep_awake_proc.poll() is None:
-        return
-    pid = str(os.getpid())
+def keep_awake(pid: int | str):
+    global _keep_awake_proc, _keep_awake_pid
+
+    if pid is None:
+        raise ValueError("pid is required")
+
+    target_pid = str(pid)
+
+    if _keep_awake_proc is not None:
+        if _keep_awake_proc.poll() is None and _keep_awake_pid == target_pid:
+            return
+        _keep_awake_proc.terminate()
+        try:
+            _keep_awake_proc.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            _keep_awake_proc.kill()
+        _keep_awake_proc = None
+        _keep_awake_pid = None
+
     if shutil.which("caffeinate"):
-        cmd = ["caffeinate", "-i", "-w", pid]
+        cmd = ["caffeinate", "-i", "-w", target_pid]
     elif shutil.which("systemd-inhibit") and platform.system() == "Linux":
         cmd = [
             "systemd-inhibit",
             "--what=sleep",
             "--mode=block",
             "--pid",
-            pid,
+            target_pid,
             "sleep",
             "infinity",
         ]
@@ -179,15 +194,18 @@ while(Get-Process -Id $p -ErrorAction SilentlyContinue){
     Start-Sleep 30
 }
 """
-        cmd = ["powershell.exe", "-WindowStyle", "Hidden", "-Command", ps_script, "--", pid]
+        cmd = ["powershell.exe", "-WindowStyle", "Hidden", "-Command", ps_script, "--", target_pid]
     else:
+        _keep_awake_pid = None
         return
     print_cmd(*cmd)
     try:
         _keep_awake_proc = subprocess.Popen(cmd)
+        _keep_awake_pid = target_pid
     except Exception as e:
         print(f"keep_awake failed: {e!r}", file=sys.stderr)
         _keep_awake_proc = None
+        _keep_awake_pid = None
 
 
 def prompt_enter(message=None):

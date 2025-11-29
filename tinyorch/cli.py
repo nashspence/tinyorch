@@ -5,7 +5,6 @@ import argparse
 import os
 import shlex
 import sys
-import time
 from pathlib import Path
 
 from .core import (
@@ -139,17 +138,16 @@ def main_run_parallel(argv: list[str] | None = None) -> None:
 def main_keep_awake(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="keep-awake",
-        description="Prevent the system from sleeping while this process is running",
+        description="Prevent the system from sleeping while the given process is running",
     )
-    parser.parse_args(argv)
+    parser.add_argument(
+        "pid",
+        type=int,
+        help="Process ID to keep awake",
+    )
+    ns = parser.parse_args(argv)
 
-    _keep_awake()
-    # keep this process alive so the inhibitor process has something to watch
-    try:
-        while True:
-            time.sleep(60)
-    except KeyboardInterrupt:
-        pass
+    _keep_awake(ns.pid)
 
 
 def main_prompt_enter(argv: list[str] | None = None) -> None:
