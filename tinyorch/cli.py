@@ -41,6 +41,24 @@ def main_notify(argv: list[str] | None = None) -> None:
     _notify(ns.message, title=ns.title, url=ns.url)
 
 
+def main_get_password(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="get-password",
+        description="Retrieve a password using get_password, prompting and storing it if needed.",
+    )
+    parser.add_argument(
+        "identifier",
+        help="Password identifier / service name (used as the keyring 'service')",
+    )
+    parser.add_argument(
+        "--account",
+        help="Account / username (defaults to $USER or current login user)",
+    )
+    ns = parser.parse_args(argv)
+    password = get_password(ns.identifier, account=ns.account)
+    print(password)
+
+
 def main_run(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="run",

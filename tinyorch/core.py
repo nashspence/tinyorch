@@ -68,6 +68,83 @@ def notify(
         print(f"notify failed: {e!r}", file=sys.stderr)
 
 
+def get_password(identifier: str, account: str | None = None) -> str:
+    if not identifier:
+        raise ValueError("identifier must be non-empty")
+
+    system = platform.system()
+    if account is None:
+        account = os.environ.get("USER")
+        if not account:
+            import pwd
+
+            account = pwd.getpwuid(os.getuid()).pw_name
+
+    if system == "Darwin":
+        proc = _run(
+            ["security", "find-generic-password", "-a", account, "-s", identifier, "-w"],
+            check=False,
+            capture_output=True,
+        )
+        if proc.returncode == 0 and proc.stdout:
+            return proc.stdout.strip()
+    elif system == "Linux":
+        if shutil.which("secret-tool") is None:
+            raise RuntimeError(
+                "secret-tool not found; install libsecret-tools or provide password another way"
+            )
+        proc = _run(
+            ["secret-tool", "lookup", "service", identifier, "account", account],
+            check=False,
+            capture_output=True,
+        )
+        if proc.returncode == 0 and proc.stdout:
+            return proc.stdout.strip()
+    else:
+        raise RuntimeError(f"Unsupported OS for password storage: {system}")
+
+    prompt = f"Enter password for '{identifier}': "
+    password = getpass.getpass(prompt)
+    if not password:
+        raise RuntimeError("Empty password not allowed")
+
+    if system == "Darwin":
+        _run(
+            [
+                "security",
+                "add-generic-password",
+                "-a",
+                account,
+                "-s",
+                identifier,
+                "-w",
+                password,
+                "-U",
+            ],
+            check=False,
+        )
+    elif system == "Linux":
+        proc = subprocess.Popen(
+            [
+                "secret-tool",
+                "store",
+                f"--label={identifier}",
+                "service",
+                identifier,
+                "account",
+                account,
+            ],
+            stdin=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            proc.communicate(password, timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+
+    return password
+
 
 def _run_once(cmd: str | list[str] | Callable[[], None]) -> None:
     if callable(cmd):
@@ -348,8 +425,8 @@ def _spawn(*args: str) -> None:
     """
     Spawn a detached helper process.
 
-    The first argument should be the executable name (e.g. 'tiny_watch_darwin'
-    or 'tiny_watch_linux'), followed by its arguments.
+    The first argument should be the executable name (e.g. 'watch-darwin'
+    or 'watch-linux'), followed by its arguments.
     """
     subprocess.Popen(
         list(args),
@@ -513,7 +590,7 @@ def _ensure_docker_host_darwin(parent_pid: int) -> Dict[str, str]:
     if not vm_socket:
         vm_socket = f"/run/user/{os.getuid()}/podman/podman.sock"
 
-    _spawn("tiny_watch_darwin", machine_name, str(parent_pid), str(state_file))
+    _spawn("watch-darwin", machine_name, str(parent_pid), str(state_file))
 
     return {
         "DOCKER_HOST": f"unix://{host_socket}",
@@ -583,7 +660,7 @@ def _ensure_docker_host_linux(parent_pid: int) -> Dict[str, str]:
             f"failed to start podman system service; socket '{socket_path}' not created"
         )
 
-    _spawn("tiny_watch_linux", str(parent_pid), str(service_pid), str(socket_path))
+    _spawn("watch-linux", str(parent_pid), str(service_pid), str(socket_path))
 
     return {
         "DOCKER_HOST": f"unix://{socket_path}",
