@@ -415,10 +415,32 @@ def _int_or_default(value: str, default: int) -> int:
 
 def _podman_cmd(*args: str) -> None:
     cmd = ["podman", *args]
-    stream = sys.stderr
-    if sys.stderr.isatty():
-        stream.write("+ " + " ".join(cmd) + "\n")
-    _run(cmd, check=False)
+
+    # Try to open /dev/tty like the shell version
+    stream = None
+    tty = None
+    try:
+        tty = open("/dev/tty", "w")
+        stream = tty
+    except OSError:
+        # No /dev/tty (non-interactive); fall back to stderr
+        stream = sys.stderr
+
+    # Print the "+ podman ..." line
+    stream.write("+ " + " ".join(cmd) + "\n")
+    stream.flush()
+
+    # Run podman with BOTH stdout and stderr going to the same stream
+    subprocess.run(
+        cmd,
+        check=False,
+        text=True,
+        stdout=stream,
+        stderr=stream,
+    )
+
+    if tty is not None:
+        tty.close()
 
 
 def _spawn(*args: str) -> None:
@@ -452,7 +474,7 @@ def _ensure_docker_host_darwin(parent_pid: int) -> Dict[str, str]:
     alive_pids = _read_state_pids(state_file)
 
     try:
-        _run(["podman", "machine", "inspect", machine_name], check=True)
+        _run(["podman", "machine", "inspect", machine_name], check=True, capture_output=True)
         proc = _run(
             [
                 "podman",
