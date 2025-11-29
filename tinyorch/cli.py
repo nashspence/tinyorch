@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .core import (
     notify as _notify,
+    get_password as _get_password,
     run as _run_stage,
     run_parallel as _run_parallel,
     keep_awake as _keep_awake,
