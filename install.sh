@@ -86,8 +86,14 @@ export TINYORCH_PYTHON="$PY"
 mkdir -p "$PIP_CACHE_DIR"
 export PIP_CACHE_DIR
 
-"$PY" -m pip install --no-cache-dir --upgrade \
-  git+https://github.com/nashspence/tinyorch.git
+# Install tinyorch: prefer local dir if provided
+if [ -n "${TINYORCH_PKG:-}" ]; then
+  TINYORCH_SRC="$TINYORCH_PKG"
+else
+  TINYORCH_SRC="git+https://github.com/nashspence/tinyorch.git"
+fi
+
+"$PY" -m pip install --no-cache-dir --upgrade "$TINYORCH_SRC"
 
 PATH="$VENV_DIR/bin:$PATH"
 export PATH
