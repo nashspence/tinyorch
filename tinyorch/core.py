@@ -50,7 +50,7 @@ def notify(
     if not urls:
         return
     cmd = [
-        docker,
+        "docker",
         "run",
         "--rm",
         "caronc/apprise:latest",
