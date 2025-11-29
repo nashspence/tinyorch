@@ -56,7 +56,7 @@ def main_get_password(argv: list[str] | None = None) -> None:
         help="Account / username (defaults to $USER or current login user)",
     )
     ns = parser.parse_args(argv)
-    password = get_password(ns.identifier, account=ns.account)
+    password = _get_password(ns.identifier, account=ns.account)
     print(password)
 
 

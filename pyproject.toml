@@ -14,7 +14,7 @@ dependencies = [
 
 [project.scripts]
 notify           = "tinyorch.cli:main_notify"
-get-password  = "tinyorch.cli:main_get_password"
+get-password     = "tinyorch.cli:main_get_password"
 run              = "tinyorch.cli:main_run"
 run-parallel     = "tinyorch.cli:main_run_parallel"
 keep-awake       = "tinyorch.cli:main_keep_awake"
