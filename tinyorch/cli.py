@@ -200,7 +200,12 @@ def main_burn_iso(argv: list[str] | None = None) -> None:
 def main_ensure_docker_host(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="ensure-docker-host",
-        description="Ensure a Docker-compatible Podman socket and print env exports",
+        description="Ensure a Docker-compatible Podman socket for the given PID and print env exports",
+    )
+    parser.add_argument(
+        "pid",
+        type=int,
+        help="PID of the process whose environment should be used",
     )
     parser.add_argument(
         "--format",
@@ -210,11 +215,9 @@ def main_ensure_docker_host(argv: list[str] | None = None) -> None:
     )
     ns = parser.parse_args(argv)
 
-    env = _ensure_docker_host(os.getpid())
+    env = _ensure_docker_host(ns.pid)
 
     if ns.format == "json":
-        import json
-
         json.dump(env, sys.stdout)
         sys.stdout.write("\n")
         return
@@ -224,7 +227,6 @@ def main_ensure_docker_host(argv: list[str] | None = None) -> None:
             sys.stdout.write(f"{k}={v}\n")
         return
 
-    # default: export
     for k, v in env.items():
         sys.stdout.write(f"export {k}={shlex.quote(v)}\n")
 
