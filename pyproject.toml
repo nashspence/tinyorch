@@ -12,6 +12,17 @@ requires-python = ">=3.10"
 dependencies = [
 ]
 
+[project.scripts]
+notify           = "tinyorch.cli:main_notify"
+run              = "tinyorch.cli:main_run"
+run-parallel     = "tinyorch.cli:main_run_parallel"
+keep-awake       = "tinyorch.cli:main_keep_awake"
+prompt-enter     = "tinyorch.cli:main_prompt_enter"
+burn-iso         = "tinyorch.cli:main_burn_iso"
+ensure-docker-host = "tinyorch.cli:main_ensure_docker_host"
+watch_darwin = "tinyorch.cli:main_watch_darwin"
+watch_linux  = "tinyorch.cli:main_watch_linux"
+
 [project.urls]
 Homepage = "https://github.com/nashspence/tinyorch"
 
