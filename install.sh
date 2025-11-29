@@ -52,8 +52,8 @@ if [ ! -x "$PKGX" ]; then
   chmod +x "$PKGX"
 fi
 
-"$PKGX" install podman.io docker.com python.org >/dev/null 2>&1 || true
-eval "$("$PKGX" +podman.io +docker.com +python.org)"
+"$PKGX" install podman.io docker python.org >/dev/null 2>&1 || true
+eval "$("$PKGX" +podman.io +docker +python.org)"
 
 VENV_DIR="${TINYORCH_VENV_DIR:-$BASE/venv}"
 export TINYORCH_VENV="$VENV_DIR"
